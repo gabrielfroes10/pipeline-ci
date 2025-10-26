@@ -1,0 +1,18 @@
+# Ignora a pasta de dependências.
+# Esta pasta é recriada com 'npm install' e não deve ir para o repositório.
+/node_modules
+
+# Logs gerados pelo npm ou yarn
+npm-debug.log
+
+# Arquivos de ambiente
+# Eles contêm chaves de API, senhas de banco de dados e outros segredos.
+# NUNCA envie estes arquivos para o repositório!
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Arquivos do Sistema Operacional
+Thumbs.db
