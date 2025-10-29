@@ -16,6 +16,9 @@ jobs:
       contents: read # Permissão para fazer checkout do código
       packages: write # Permissão para FAZER PUSH de pacotes (imagem Docker)
     # Os passos (steps) que o job executará em sequência
+    permissions:
+    contents: read # Permissão para fazer checkout do código
+    packages: write # Permissão para FAZER PUSH de pacotes (imagem Docker)  
     steps:
       # 1. Baixa o código do repositório para a máquina virtual
       - name: Checkout do Código
