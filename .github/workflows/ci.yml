@@ -2,7 +2,7 @@
 name: Pipeline de CI - Olá Mundo DevOps
 # Define quando o pipeline deve rodar
 on:
-  push: # Rodar em todo push
+  push: # Rodar em todo pus
     branches: ["main"] # Apenas na branch main
   pull_request: # Rodar em todo pull request
     branches: ["main"] # Que tenha como alvo a branch main
