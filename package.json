@@ -9,12 +9,21 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
   "dependencies": {
+    "D": "^1.0.0",
     "express": "^5.1.0"
   },
   "devDependencies": {
     "jest": "^30.2.0",
     "supertest": "^7.1.4"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/raffael-carvalho/ci.git"
+  },
+  "bugs": {
+    "url": "https://github.com/raffael-carvalho/ci/issues"
+  },
+  "homepage": "https://github.com/raffael-carvalho/ci#readme",
+  "description": ""
 }
