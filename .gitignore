@@ -1,7 +1,7 @@
 # Ignora a pasta de dependências.
 # Esta pasta é recriada com 'npm install' e não deve ir para o repositório.
 /node_modules
-
+/actions-runner
 # Logs gerados pelo npm ou yarn
 npm-debug.log
 
