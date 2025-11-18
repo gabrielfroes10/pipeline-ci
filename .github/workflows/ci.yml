@@ -1,5 +1,5 @@
 # .github/workflows/ci.yml
-name: Pipeline de CI - Olá Mundo DevOps
+name: Pipeline de CD - Olá Mundo DevOps
 # Define quando o pipeline deve rodar
 on:
   push: # Rodar em todo push
@@ -69,3 +69,35 @@ jobs:
           # Usa as tags geradas pelo 'metadata-action'
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+  # ---------------------------------------------------
+  # JOB 2: CD (O NOVO ESTÁGIO DE DEPLOY LOCAL)
+  # ---------------------------------------------------
+  deploy-to-local:
+    # Este job SÓ RODA se for um push na 'main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    # CORREÇÃO: Ele precisa que o Job 1 (test-and-build) termine com sucesso
+    needs: test-and-build
+
+    # Ele roda no seu PC (onde o runner está ouvindo)
+    runs-on: self-hosted
+
+    steps:
+      # 1. Pega o código (para ter o docker-compose.yml)
+      - name: Checkout do Código
+        uses: actions/checkout@v4
+
+      # 2. Loga no GHCR (para poder BAIXAR a imagem)
+      - name: Logar no GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 3. Executa o Deploy
+      - name: Fazer Deploy com Docker Compose
+        run: |
+          docker-compose pull
+          docker-compose up -d --no-build
+          docker image prune -f

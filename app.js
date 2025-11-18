@@ -4,7 +4,7 @@ const express = require("express");
 const app = express();
 
 app.get("/", (req, res) => {
-  res.status(200).send("Olá Mundo DevOps!");
+  res.status(200).send("Olá tudo bem?");
 });
 
 module.exports = app; // Exportamos o app
