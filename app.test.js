@@ -10,6 +10,6 @@ describe("API Olá Mundo", () => {
     expect(response.statusCode).toBe(200);
 
     // Verifica se o corpo da resposta é o esperado
-    expect(response.text).toBe("Deu tudo certo Rafa, Muito Obrigado. Deus é bom");
+    expect(response.text).toBe("Olá tudo bem?");
   });
 });
