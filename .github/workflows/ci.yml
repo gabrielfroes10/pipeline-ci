@@ -1,93 +1,126 @@
-# .github/workflows/ci.yml
-name: Pipeline de CD - Olá Mundo DevOps
-# Define quando o pipeline deve rodar
+name: Pipeline DevSecOps - CI/CD Seguro
+
+# Gatilhos do Pipeline
 on:
-  push: # Rodar em todo push
-    branches: ["main"] # Apenas na branch main
-  pull_request: # Rodar em todo pull request
-    branches: ["main"] # Que tenha como alvo a branch main
-# Define os "trabalhos" (jobs) que o pipeline executará
+  push:
+    branches: ["main"] # Dispara CI + Segurança + CD (Deploy)
+  pull_request:
+    branches: ["main"] # Dispara CI + Segurança (Apenas Teste)
+
 jobs:
-  # O nome do nosso job é "test-and-build"
+  # ---------------------------------------------------
+  # JOB 1: CI, SEGURANÇA & ENTREGA
+  # ---------------------------------------------------
   test-and-build:
-    # A máquina virtual que o job usará
     runs-on: ubuntu-latest
     permissions:
-      contents: read # Permissão para fazer checkout do código
-      packages: write # Permissão para FAZER PUSH de pacotes (imagem Docker)
-    # Os passos (steps) que o job executará em sequência
+      contents: read # Para ler o código
+      packages: write # Para publicar no GHCR
+      security-events: write # (Opcional) Para relatórios de segurança
+
     steps:
-      # 1. Baixa o código do repositório para a máquina virtual
+      # 1. Preparação do Ambiente
       - name: Checkout do Código
         uses: actions/checkout@v4
-      # 2. Configura o ambiente Node.js
+
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22" # Usamos a mesma versão do Dockerfile
-          cache: "npm" # Habilita o cache do npm para builds mais rápidos
-      # 3. Instala todas as dependências (incluindo devDependencies)
+          node-version: "22"
+          cache: "npm"
+
       - name: Instalar Dependências
         run: npm install
-      # 4. Executa os testes
-      - name: Rodar Testes
+
+      # 2. Testes Unitários (Qualidade)
+      - name: Rodar Testes Unitários
         run: npm test
-      # 5. Configura o Docker Buildx (necessário para build)
+
+      # 3. SCA - Análise de Dependências (Segurança) [NOVO]
+      # Verifica se as bibliotecas (node_modules) têm falhas conhecidas.
+      # Falha o pipeline se encontrar erros de nível ALTO.
+      - name: Verificar vulnerabilidades de dependências (SCA)
+        run: npm audit --audit-level=high
+
+      # 4. Configuração do Docker
       - name: Configurar Docker Buildx
         uses: docker/setup-buildx-action@v3
-      # 6. Logar no GitHub Container Registry (GHCR)
-      # Este step só roda se for um push na branch main
+
       - name: Logar no GitHub Container Registry
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }} # Segredo automático do GitHub!
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 7. Extrair metadados (tags) para o Docker
-      # Este step só roda se for um push na branch main
       - name: Extrair Metadados do Docker
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }} # ghcr.io/SEU_USUARIO/SEU_REPO
+          images: ghcr.io/${{ github.repository }}
           tags: |
             type=sha
             latest
 
-      # 8. Build E PUSH da Imagem Docker
-      # Note que este step agora tem um 'if' e usa os 'labels' e 'tags' do step anterior
-      - name: Build e Push da Imagem Docker
+      # 5. Build Local para Escaneamento [MODIFICADO]
+      # Constrói a imagem, mas NÃO envia ainda (load: true)
+      - name: Build da Imagem Docker (Preparação para Scan)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          # Só faz PUSH se for um push na branch main
-          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          # Usa as tags geradas pelo 'metadata-action'
+          push: false # Importante: Não publicar ainda!
+          load: true # Carrega no Docker local do runner
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # SOLUÇÃO PARA O CACHE
+          no-cache: true # Adicione esta linha para forçar a reinstalação de dependências
+      # 6. Container Scan com Trivy (Segurança) [NOVO]
+      # Verifica se a imagem do SO ou do Node tem falhas.
+      - name: Escanear dependências Node com Trivy (SCA)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs" # scan no sistema de arquivos
+          scan-ref: "." # escaneia somente o código do repositório
+          scanners: "vuln" # ignora secret scan e config scan
+          format: "table"
+          exit-code: "1"
+          severity: "HIGH,CRITICAL" # só falha para HIGH e CRITICAL
+          ignore-unfixed: true # ignora CVEs sem patch (boa prática)
+
+      # 7. Push da Imagem (Entrega) [MODIFICADO]
+      # Só roda se for na main E se o Trivy tiver passado
+      - name: Push da Imagem Docker para o GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true # Agora sim, publica!
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
   # ---------------------------------------------------
-  # JOB 2: CD (O NOVO ESTÁGIO DE DEPLOY LOCAL)
+  # JOB 2: CD (DEPLOY LOCAL)
   # ---------------------------------------------------
   deploy-to-local:
-    # Este job SÓ RODA se for um push na 'main'
+    # Só roda se for push na main
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
-    # CORREÇÃO: Ele precisa que o Job 1 (test-and-build) termine com sucesso
+    # Só roda se o Job 1 (com todos os testes de segurança) passar
     needs: test-and-build
 
-    # Ele roda no seu PC (onde o runner está ouvindo)
+    # Roda na sua máquina local
     runs-on: self-hosted
+    permissions:
+      contents: read
+      packages: read
 
     steps:
-      # 1. Pega o código (para ter o docker-compose.yml)
       - name: Checkout do Código
         uses: actions/checkout@v4
 
-      # 2. Loga no GHCR (para poder BAIXAR a imagem)
       - name: Logar no GitHub Container Registry (GHCR)
         uses: docker/login-action@v3
         with:
@@ -95,9 +128,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 3. Executa o Deploy
       - name: Fazer Deploy com Docker Compose
         run: |
+          echo "Iniciando deploy seguro..."
           docker-compose pull
           docker-compose up -d --no-build
           docker image prune -f
+          echo "Deploy concluído com sucesso!"
